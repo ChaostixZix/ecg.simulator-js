@@ -197,17 +197,39 @@ class ECGGenerator {
             ...this.config.pWave,
             amplitude: this.config.pWave.amplitude * this.config.amplitude * leadMultiplier
         }, this.config.samplingRate);
-        const qrsWave = generateQRSComplex(qrsTime, {
-            ...this.config.qrsComplex,
-            amplitude: this.config.qrsComplex.amplitude * this.config.amplitude * leadMultiplier
-        }, this.config.samplingRate);
         const stElevation = this.config.stSegment.elevation[lead] || 0;
         const stDepression = this.config.stSegment.depression[lead] || 0;
         const stOffset = (stElevation - stDepression) * this.config.amplitude * leadMultiplier;
-        const stSegment = generateSTSegment(stStart, stEnd, stOffset, this.config.samplingRate);
+        // Enhance S-wave and T-wave for leads with ST elevation (STEMI morphology)
+        let qrsConfig = { ...this.config.qrsComplex };
+        let tWaveConfig = { ...this.config.tWave };
+        if (stElevation > 0.2) { // Significant ST elevation
+            // Further elevate S-wave in STEMI leads
+            if (qrsConfig.qrs) {
+                qrsConfig.qrs = {
+                    ...qrsConfig.qrs,
+                    sAmpMul: (qrsConfig.qrs.sAmpMul || -0.2) + (stElevation * 0.5) // More positive S-wave
+                };
+            }
+            // Increase T-wave amplitude proportionally to ST elevation
+            tWaveConfig = {
+                ...tWaveConfig,
+                amplitude: tWaveConfig.amplitude + (stElevation * 0.8) // Hyperacute T-waves
+            };
+        }
+        const qrsWave = generateQRSComplex(qrsTime, {
+            ...qrsConfig,
+            amplitude: qrsConfig.amplitude * this.config.amplitude * leadMultiplier
+        }, this.config.samplingRate);
+        const stSegment = generateSTSegment(stStart, stEnd, stOffset, this.config.samplingRate, undefined, // context - could be enhanced later
+        {
+            stModel: stElevation > 0.2 ? 'sigmoidArc' : 'hermite', // Use convex arc for STEMI
+            stCurvature: 0.8, // More convex for STEMI
+            alphaTakeoff: 0.9 // Smoother takeoff
+        });
         const tWave = generateTWave(tTime, {
-            ...this.config.tWave,
-            amplitude: this.config.tWave.amplitude * this.config.amplitude * leadMultiplier
+            ...tWaveConfig,
+            amplitude: tWaveConfig.amplitude * this.config.amplitude * leadMultiplier
         }, this.config.samplingRate);
         const baseline = Array.from({ length: Math.floor(beatDuration * this.config.samplingRate) }, (_, i) => ({
             time: startTime + i / this.config.samplingRate,
@@ -612,10 +634,11 @@ class ClinicalPatterns {
                 },
                 qrsComplex: {
                     amplitude: 1.2, duration: 0.08, shape: 'triangular',
-                    // Raise S-wave (less negative) to visually match early ST elevation takeoff
-                    qrs: { sAmpMul: -0.05 }
+                    // Elevate S-wave significantly for STEMI - less negative, often positive
+                    qrs: { sAmpMul: 0.1 } // Positive S-wave in STEMI leads
                 },
-                tWave: { amplitude: 0.5, duration: 0.18, shape: 'gaussian' }
+                // T-wave should be elevated and peaked in STEMI leads
+                tWave: { amplitude: 0.7, duration: 0.20, shape: 'gaussian' }
             },
             'stemi-inferior': {
                 heartRate: 65,
@@ -625,9 +648,10 @@ class ClinicalPatterns {
                 },
                 qrsComplex: {
                     amplitude: 1.1, duration: 0.08, shape: 'triangular',
-                    qrs: { sAmpMul: -0.05 }
+                    // Elevate S-wave in inferior STEMI leads
+                    qrs: { sAmpMul: 0.05 }
                 },
-                tWave: { amplitude: 0.4, duration: 0.17, shape: 'gaussian' }
+                tWave: { amplitude: 0.6, duration: 0.17, shape: 'gaussian' }
             },
             'stemi-lateral': {
                 heartRate: 90,
@@ -637,9 +661,10 @@ class ClinicalPatterns {
                 },
                 qrsComplex: {
                     amplitude: 1.3, duration: 0.08, shape: 'triangular',
-                    qrs: { sAmpMul: -0.05 }
+                    // Elevate S-wave in lateral STEMI leads
+                    qrs: { sAmpMul: 0.1 }
                 },
-                tWave: { amplitude: 0.4, duration: 0.16, shape: 'gaussian' }
+                tWave: { amplitude: 0.6, duration: 0.16, shape: 'gaussian' }
             },
             nstemi: {
                 heartRate: 88,

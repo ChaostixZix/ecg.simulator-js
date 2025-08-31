@@ -42,20 +42,47 @@ export class ECGGenerator {
       amplitude: this.config.pWave.amplitude * this.config.amplitude * leadMultiplier
     }, this.config.samplingRate);
 
-    const qrsWave = generateQRSComplex(qrsTime, {
-      ...this.config.qrsComplex,
-      amplitude: this.config.qrsComplex.amplitude * this.config.amplitude * leadMultiplier
-    }, this.config.samplingRate);
-
     const stElevation = this.config.stSegment.elevation[lead] || 0;
     const stDepression = this.config.stSegment.depression[lead] || 0;
     const stOffset = (stElevation - stDepression) * this.config.amplitude * leadMultiplier;
     
-    const stSegment = generateSTSegment(stStart, stEnd, stOffset, this.config.samplingRate);
+    // Enhance S-wave and T-wave for leads with ST elevation (STEMI morphology)
+    let qrsConfig = { ...this.config.qrsComplex };
+    let tWaveConfig = { ...this.config.tWave };
+    
+    if (stElevation > 0.2) { // Significant ST elevation
+      // Further elevate S-wave in STEMI leads
+      if (qrsConfig.qrs) {
+        qrsConfig.qrs = {
+          ...qrsConfig.qrs,
+          sAmpMul: (qrsConfig.qrs.sAmpMul || -0.2) + (stElevation * 0.5) // More positive S-wave
+        };
+      }
+      
+      // Increase T-wave amplitude proportionally to ST elevation
+      tWaveConfig = {
+        ...tWaveConfig,
+        amplitude: tWaveConfig.amplitude + (stElevation * 0.8) // Hyperacute T-waves
+      };
+    }
+
+    const qrsWave = generateQRSComplex(qrsTime, {
+      ...qrsConfig,
+      amplitude: qrsConfig.amplitude * this.config.amplitude * leadMultiplier
+    }, this.config.samplingRate);
+    
+    const stSegment = generateSTSegment(stStart, stEnd, stOffset, this.config.samplingRate, 
+      undefined, // context - could be enhanced later
+      { 
+        stModel: stElevation > 0.2 ? 'sigmoidArc' : 'hermite', // Use convex arc for STEMI
+        stCurvature: 0.8, // More convex for STEMI
+        alphaTakeoff: 0.9 // Smoother takeoff
+      }
+    );
 
     const tWave = generateTWave(tTime, {
-      ...this.config.tWave,
-      amplitude: this.config.tWave.amplitude * this.config.amplitude * leadMultiplier
+      ...tWaveConfig,
+      amplitude: tWaveConfig.amplitude * this.config.amplitude * leadMultiplier
     }, this.config.samplingRate);
 
     const baseline = Array.from({ length: Math.floor(beatDuration * this.config.samplingRate) }, (_, i) => ({

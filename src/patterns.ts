@@ -19,10 +19,11 @@ export class ClinicalPatterns {
         },
         qrsComplex: { 
           amplitude: 1.2, duration: 0.08, shape: 'triangular',
-          // Raise S-wave (less negative) to visually match early ST elevation takeoff
-          qrs: { sAmpMul: -0.05 }
+          // Elevate S-wave significantly for STEMI - less negative, often positive
+          qrs: { sAmpMul: 0.1 }  // Positive S-wave in STEMI leads
         },
-        tWave: { amplitude: 0.5, duration: 0.18, shape: 'gaussian' }
+        // T-wave should be elevated and peaked in STEMI leads
+        tWave: { amplitude: 0.7, duration: 0.20, shape: 'gaussian' }
       },
 
       'stemi-inferior': {
@@ -33,9 +34,10 @@ export class ClinicalPatterns {
         },
         qrsComplex: { 
           amplitude: 1.1, duration: 0.08, shape: 'triangular',
-          qrs: { sAmpMul: -0.05 }
+          // Elevate S-wave in inferior STEMI leads
+          qrs: { sAmpMul: 0.05 }
         },
-        tWave: { amplitude: 0.4, duration: 0.17, shape: 'gaussian' }
+        tWave: { amplitude: 0.6, duration: 0.17, shape: 'gaussian' }
       },
 
       'stemi-lateral': {
@@ -46,9 +48,10 @@ export class ClinicalPatterns {
         },
         qrsComplex: { 
           amplitude: 1.3, duration: 0.08, shape: 'triangular',
-          qrs: { sAmpMul: -0.05 }
+          // Elevate S-wave in lateral STEMI leads
+          qrs: { sAmpMul: 0.1 }
         },
-        tWave: { amplitude: 0.4, duration: 0.16, shape: 'gaussian' }
+        tWave: { amplitude: 0.6, duration: 0.16, shape: 'gaussian' }
       },
 
       nstemi: {
