@@ -24,6 +24,17 @@ export interface WaveformConfig {
     amplitude: number;
     duration: number;
     shape: 'gaussian' | 'triangular' | 'custom';
+    qrs?: {
+        qOffsetFrac?: number;
+        rOffsetFrac?: number;
+        sOffsetFrac?: number;
+        qWidthFrac?: number;
+        rWidthFrac?: number;
+        sWidthFrac?: number;
+        qAmpMul?: number;
+        rAmpMul?: number;
+        sAmpMul?: number;
+    };
 }
 export interface STSegmentConfig {
     elevation: Partial<Record<ECGLead, number>>;
