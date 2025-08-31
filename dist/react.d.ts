@@ -1,6 +1,59 @@
 import React from 'react';
-import { ECGConfiguration, ECGData, RenderOptions, ClinicalPattern } from './types';
-export interface ECGCanvasProps {
+
+type ECGLead = 'I' | 'II' | 'III' | 'aVR' | 'aVL' | 'aVF' | 'V1' | 'V2' | 'V3' | 'V4' | 'V5' | 'V6';
+interface ECGPoint {
+    time: number;
+    amplitude: number;
+}
+interface ECGLeadData {
+    lead: ECGLead;
+    data: ECGPoint[];
+}
+interface ECGConfiguration {
+    heartRate: number;
+    duration: number;
+    samplingRate: number;
+    amplitude: number;
+    pWave: WaveformConfig;
+    qrsComplex: WaveformConfig;
+    tWave: WaveformConfig;
+    stSegment: STSegmentConfig;
+    prInterval: number;
+    qtInterval: number;
+    qrsWidth: number;
+}
+interface WaveformConfig {
+    amplitude: number;
+    duration: number;
+    shape: 'gaussian' | 'triangular' | 'custom';
+}
+interface STSegmentConfig {
+    elevation: Partial<Record<ECGLead, number>>;
+    depression: Partial<Record<ECGLead, number>>;
+}
+interface ECGData {
+    leads: ECGLeadData[];
+    configuration: ECGConfiguration;
+    timestamp: number;
+}
+type ClinicalPattern = 'normal' | 'stemi-anterior' | 'stemi-inferior' | 'stemi-lateral' | 'nstemi' | 'pericarditis' | 'lvh' | 'rbbb' | 'lbbb';
+interface RenderOptions {
+    width: number;
+    height: number;
+    gridSize: number;
+    gridColor: string;
+    traceColor: string;
+    backgroundColor: string;
+    showGrid: boolean;
+    showLabels: boolean;
+    gain: number;
+    paperSpeed: number;
+    panelPadding: number;
+    panelGapX: number;
+    panelGapY: number;
+}
+
+interface ECGCanvasProps {
     configuration?: Partial<ECGConfiguration>;
     renderOptions?: Partial<RenderOptions>;
     pattern?: ClinicalPattern;
@@ -10,7 +63,7 @@ export interface ECGCanvasProps {
     className?: string;
     style?: React.CSSProperties;
 }
-export interface ECGCanvasRef {
+interface ECGCanvasRef {
     generateECG: () => ECGData;
     exportAsJSON: () => string;
     exportAsCSV: () => string;
@@ -22,8 +75,8 @@ export interface ECGCanvasRef {
     updateConfiguration: (config: Partial<ECGConfiguration>) => void;
     updateRenderOptions: (options: Partial<RenderOptions>) => void;
 }
-export declare const ECGCanvas: any;
-export interface ECGControlPanelProps {
+declare const ECGCanvas: any;
+interface ECGControlPanelProps {
     onConfigurationChange?: (config: Partial<ECGConfiguration>) => void;
     onPatternChange?: (pattern: ClinicalPattern) => void;
     onRenderOptionsChange?: (options: Partial<RenderOptions>) => void;
@@ -33,8 +86,8 @@ export interface ECGControlPanelProps {
     className?: string;
     style?: React.CSSProperties;
 }
-export declare const ECGControlPanel: React.FC<ECGControlPanelProps>;
-export interface ECGSimulatorProps {
+declare const ECGControlPanel: React.FC<ECGControlPanelProps>;
+interface ECGSimulatorProps {
     width?: number;
     height?: number;
     initialConfiguration?: Partial<ECGConfiguration>;
@@ -45,5 +98,6 @@ export interface ECGSimulatorProps {
     className?: string;
     style?: React.CSSProperties;
 }
-export declare const ECGSimulator: React.FC<ECGSimulatorProps>;
-//# sourceMappingURL=react.d.ts.map
+declare const ECGSimulator: React.FC<ECGSimulatorProps>;
+
+export { ECGCanvas, ECGCanvasProps, ECGCanvasRef, ECGControlPanel, ECGControlPanelProps, ECGSimulator, ECGSimulatorProps };
