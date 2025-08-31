@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG Simulator Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #ecg-canvas {
+            border: 1px solid #ddd;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+        }
+        .st-controls {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .st-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+        .st-control input {
+            width: 60px;
+            padding: 4px;
+        }
+        .info-panel {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .info-panel h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ECG Simulator Demo</h1>
+        
+        <div class="info-panel">
+            <h3>Interactive 12-Lead ECG Simulator</h3>
+            <p>This demo showcases the ECG-JS library's capabilities for generating realistic 12-lead ECG patterns. 
+            Adjust the controls below to modify heart rate, rhythm patterns, and ST-segment changes to simulate 
+            various cardiac conditions.</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="heartRate">Heart Rate (bpm):</label>
+                <input type="range" id="heartRate" min="40" max="150" value="75">
+                <span id="heartRateValue">75</span>
+            </div>
+
+            <div class="control-group">
+                <label for="duration">Duration (seconds):</label>
+                <input type="range" id="duration" min="5" max="30" value="10">
+                <span id="durationValue">10</span>
+            </div>
+
+            <div class="control-group">
+                <label for="amplitude">Amplitude:</label>
+                <input type="range" id="amplitude" min="0.5" max="2" step="0.1" value="1">
+                <span id="amplitudeValue">1.0</span>
+            </div>
+
+            <div class="control-group">
+                <label for="gain">Display Gain:</label>
+                <input type="range" id="gain" min="5" max="25" value="10">
+                <span id="gainValue">10</span>
+            </div>
+
+            <div class="control-group">
+                <label for="pattern">Clinical Pattern:</label>
+                <select id="pattern">
+                    <option value="normal">Normal</option>
+                    <option value="stemi-anterior">STEMI - Anterior</option>
+                    <option value="stemi-inferior">STEMI - Inferior</option>
+                    <option value="stemi-lateral">STEMI - Lateral</option>
+                    <option value="nstemi">NSTEMI</option>
+                    <option value="pericarditis">Pericarditis</option>
+                    <option value="lvh">Left Ventricular Hypertrophy</option>
+                    <option value="rbbb">Right Bundle Branch Block</option>
+                    <option value="lbbb">Left Bundle Branch Block</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showGrid" checked> Show Grid
+                </label>
+                <label>
+                    <input type="checkbox" id="showLabels" checked> Show Labels
+                </label>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>ST-Segment Elevation/Depression (mV):</label>
+                <div class="st-controls">
+                    <div class="st-control">
+                        <label>I:</label>
+                        <input type="number" id="st-I" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>II:</label>
+                        <input type="number" id="st-II" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>III:</label>
+                        <input type="number" id="st-III" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>aVR:</label>
+                        <input type="number" id="st-aVR" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>aVL:</label>
+                        <input type="number" id="st-aVL" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>aVF:</label>
+                        <input type="number" id="st-aVF" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>V1:</label>
+                        <input type="number" id="st-V1" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>V2:</label>
+                        <input type="number" id="st-V2" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>V3:</label>
+                        <input type="number" id="st-V3" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>V4:</label>
+                        <input type="number" id="st-V4" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>V5:</label>
+                        <input type="number" id="st-V5" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                    <div class="st-control">
+                        <label>V6:</label>
+                        <input type="number" id="st-V6" min="-1" max="1" step="0.1" value="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button onclick="generateECG()">Generate ECG</button>
+            <button onclick="exportJSON()">Export JSON</button>
+            <button onclick="exportCSV()">Export CSV</button>
+            <button onclick="exportSVG()">Export SVG</button>
+            <button onclick="resetControls()">Reset</button>
+        </div>
+
+        <canvas id="ecg-canvas" width="1200" height="800"></canvas>
+    </div>
+
+    <script type="module">
+        import { ECGGenerator, ECGRenderer, ECGExporter, ClinicalPatterns } from '../dist/index.mjs';
+
+        let currentECGData = null;
+        let renderer = null;
+
+        function initializeRenderer() {
+            const canvas = document.getElementById('ecg-canvas');
+            renderer = new ECGRenderer(canvas, {
+                width: 1200,
+                height: 800,
+                gridSize: 5,
+                gridColor: '#ffcccc',
+                traceColor: '#000000',
+                backgroundColor: '#ffffff',
+                showGrid: true,
+                showLabels: true,
+                gain: 10,
+                paperSpeed: 25
+            });
+        }
+
+        function updateSliderValues() {
+            document.getElementById('heartRateValue').textContent = document.getElementById('heartRate').value;
+            document.getElementById('durationValue').textContent = document.getElementById('duration').value;
+            document.getElementById('amplitudeValue').textContent = document.getElementById('amplitude').value;
+            document.getElementById('gainValue').textContent = document.getElementById('gain').value;
+        }
+
+        function getSTSegmentValues() {
+            const elevation = {};
+            const depression = {};
+            const leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+            
+            leads.forEach(lead => {
+                const value = parseFloat(document.getElementById(`st-${lead}`).value);
+                if (value > 0) {
+                    elevation[lead] = value;
+                } else if (value < 0) {
+                    depression[lead] = Math.abs(value);
+                }
+            });
+            
+            return { elevation, depression };
+        }
+
+        function setSTSegmentValues(elevation = {}, depression = {}) {
+            const leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+            
+            leads.forEach(lead => {
+                const elevationValue = elevation[lead] || 0;
+                const depressionValue = depression[lead] || 0;
+                const value = elevationValue - depressionValue;
+                document.getElementById(`st-${lead}`).value = value.toFixed(1);
+            });
+        }
+
+        window.generateECG = function() {
+            const heartRate = parseInt(document.getElementById('heartRate').value);
+            const duration = parseInt(document.getElementById('duration').value);
+            const amplitude = parseFloat(document.getElementById('amplitude').value);
+            const pattern = document.getElementById('pattern').value;
+            const stSegment = getSTSegmentValues();
+
+            let config = {
+                heartRate,
+                duration,
+                amplitude,
+                samplingRate: 1000,
+                stSegment,
+                pWave: { amplitude: 0.2, duration: 0.08, shape: 'gaussian' },
+                qrsComplex: { amplitude: 1.0, duration: 0.08, shape: 'triangular' },
+                tWave: { amplitude: 0.3, duration: 0.16, shape: 'gaussian' },
+                prInterval: 0.16,
+                qtInterval: 0.40,
+                qrsWidth: 0.08
+            };
+
+            if (pattern !== 'normal') {
+                const patternConfig = ClinicalPatterns.getPattern(pattern);
+                config = { ...config, ...patternConfig };
+                if (patternConfig.stSegment) {
+                    setSTSegmentValues(patternConfig.stSegment.elevation, patternConfig.stSegment.depression);
+                }
+            }
+
+            const generator = new ECGGenerator(config);
+            currentECGData = generator.generate();
+
+            const gain = parseInt(document.getElementById('gain').value);
+            const showGrid = document.getElementById('showGrid').checked;
+            const showLabels = document.getElementById('showLabels').checked;
+
+            renderer.updateOptions({ gain, showGrid, showLabels });
+            renderer.render(currentECGData);
+        }
+
+        window.exportJSON = function() {
+            if (!currentECGData) {
+                alert('Please generate an ECG first');
+                return;
+            }
+            const json = ECGExporter.toJSON(currentECGData);
+            ECGExporter.downloadFile(json, 'ecg-data.json', 'application/json');
+        }
+
+        window.exportCSV = function() {
+            if (!currentECGData) {
+                alert('Please generate an ECG first');
+                return;
+            }
+            const csv = ECGExporter.toCSV(currentECGData);
+            ECGExporter.downloadFile(csv, 'ecg-data.csv', 'text/csv');
+        }
+
+        window.exportSVG = function() {
+            if (!currentECGData) {
+                alert('Please generate an ECG first');
+                return;
+            }
+            const svg = renderer.exportAsSVG(currentECGData);
+            ECGExporter.downloadFile(svg, 'ecg-trace.svg', 'image/svg+xml');
+        }
+
+        window.resetControls = function() {
+            document.getElementById('heartRate').value = 75;
+            document.getElementById('duration').value = 10;
+            document.getElementById('amplitude').value = 1;
+            document.getElementById('gain').value = 10;
+            document.getElementById('pattern').value = 'normal';
+            document.getElementById('showGrid').checked = true;
+            document.getElementById('showLabels').checked = true;
+            
+            const leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+            leads.forEach(lead => {
+                document.getElementById(`st-${lead}`).value = 0;
+            });
+            
+            updateSliderValues();
+            generateECG();
+        }
+
+        // Event listeners
+        document.getElementById('heartRate').addEventListener('input', updateSliderValues);
+        document.getElementById('duration').addEventListener('input', updateSliderValues);
+        document.getElementById('amplitude').addEventListener('input', updateSliderValues);
+        document.getElementById('gain').addEventListener('input', updateSliderValues);
+
+        document.getElementById('pattern').addEventListener('change', function() {
+            const pattern = this.value;
+            if (pattern !== 'normal') {
+                const patternConfig = ClinicalPatterns.getPattern(pattern);
+                if (patternConfig.stSegment) {
+                    setSTSegmentValues(patternConfig.stSegment.elevation, patternConfig.stSegment.depression);
+                }
+            }
+            generateECG();
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeRenderer();
+            updateSliderValues();
+            generateECG();
+        });
+    </script>
+</body>
+</html>
