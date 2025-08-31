@@ -2,6 +2,13 @@
 
 A lightweight TypeScript library for educational 12-lead ECG simulation with Canvas/SVG rendering support.
 
+**Normal ECG Pattern:**
+![Normal ECG Pattern](https://github.com/user-attachments/assets/295017ee-825e-422c-b939-fb695c8240e6)
+
+**STEMI - Anterior Pattern:**
+![STEMI Anterior Pattern](https://github.com/user-attachments/assets/5ba518ee-0716-401b-bbb2-937c1a4e698d)
+
+
 ## Features
 
 - **Realistic ECG Waveforms**: Generate PQRST morphology with accurate timing intervals
@@ -222,13 +229,6 @@ If you're using VS Code, install the "Live Server" extension, then right-click o
 - Export functionality (JSON, CSV, SVG)
 - Interactive rendering controls (gain, grid, labels)
 
-### Screenshots
-
-**Normal ECG Pattern:**
-![Normal ECG Pattern](https://github.com/user-attachments/assets/295017ee-825e-422c-b939-fb695c8240e6)
-
-**STEMI - Anterior Pattern:**
-![STEMI Anterior Pattern](https://github.com/user-attachments/assets/5ba518ee-0716-401b-bbb2-937c1a4e698d)
 
 ## Development
 
