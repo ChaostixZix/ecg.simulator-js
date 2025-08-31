@@ -1,4 +1,74 @@
 1) Context
+Tujuan: Minta ChatGPT membantu memperbaiki tampilan ECG di proyek ecg-js agar mengikuti standar klinis (time-base, voltage calibration, interval normal), karena saat ini kompleks QRS tampak terlalu berdekatan (time axis terlalu terkompresi).
+
+Konteks singkat proyek:
+- Repo: ecg-js (frontend JS/TS yang menggambar 12-lead ECG pada `<canvas>` dan ekspor SVG)
+- File utama terkait tampilan: `src/renderer.ts` (fungsi `drawTrace` dan `render`)
+- File generator sinyal: `src/generator.ts` (mengatur `heartRate`, `duration`, `samplingRate`, `prInterval`, `qrsWidth`, `qtInterval`, dll.)
+- Demo: `demo/index.html` menginisialisasi `ECGRenderer` dengan opsi default: `gridSize: 5`, `paperSpeed: 25`, `gain: 10`, `samplingRate: 1000`, dll.
+
+Masalah yang kami lihat:
+- Di UI, kompleks QRS tampak terlalu berdekatan seperti heart rate lebih tinggi dari yang diatur, atau time axis terkompresi terlalu banyak.
+- Di `src/renderer.ts`, skala waktu dihitung seperti ini:
+  - `pxPerSecond = paperSpeed * gridSize` (dengan default `paperSpeed=25 mm/s`, `gridSize=5 px/mm` → `pxPerSecond=125 px/s`).
+  - `timeScale = Math.min(pxPerSecond, width / maxTime)`.
+  - Konsekuensinya, bila `maxTime` (mis. `duration`=10 s) besar, maka `width/maxTime` jauh lebih kecil daripada `pxPerSecond`, sehingga `timeScale` mengambil nilai `width/maxTime` → seluruh 10 detik “dipaksa muat” ke lebar panel. Inilah yang membuat QRS tampak terlalu rapat.
+
+Standar klinis yang harus diikuti (tolong pastikan angka benar sesuai praktik klinis umum):
+- Kecepatan kertas: 25 mm/s adalah standar umum; kadang 50 mm/s.
+- Kalibrasi tegangan: 10 mm/mV (1 mV = 10 mm vertikal). Satu kotak kecil 1 mm = 0.1 mV; satu kotak besar 5 mm = 0.5 mV.
+- Grid waktu pada 25 mm/s: 1 mm horizontal = 40 ms; 5 mm (kotak besar) = 200 ms.
+- Heart rate normal sinus dewasa saat istirahat: ~60–100 bpm (aturan cepat: HR = 60,000 / RR_ms).
+- Interval PR: 120–200 ms (0.12–0.20 s).
+- Durasi QRS: 80–120 ms (0.08–0.12 s). >120 ms dianggap melebar (bundle branch block, dsb.).
+- Interval QT: bergantung HR; gunakan QT terkoreksi (QTc). Batas umum: pria ≤440–450 ms, wanita ≤460–470 ms (mohon gunakan rujukan yang wajar dan konsisten).
+- Durasi gelombang P: <120 ms, amplitudo biasanya <2.5 mm pada lead ekstremitas.
+- Sampling diagnostik: ≥250 Hz; lazim 500–1000 Hz. Saat ini kami pakai 1000 Hz.
+- Filter (untuk referensi, jangan merusak durasi QRS): high‑pass ~0.5 Hz (anti baseline wander), low‑pass ~40–150 Hz, notch 50/60 Hz bila perlu.
+
+Yang kami butuhkan dari ChatGPT:
+1) Diagnosis akar masalah time scaling saat ini dan perbaikannya.
+   - Harus menghapus “fit-to-width” waktu untuk seluruh `duration`. Alih‑alih, selalu pakai time base klinis: `pxPerSecond = paperSpeed(mm/s) * pxPerMm` dan render hanya window waktu yang muat pada panel.
+   - Opsi A (paling standar): render per panel sekitar 2.5 detik pada 25 mm/s (seperti kertas ECG standar 12‑lead). Artinya, lebar jejak tiap lead harus mewakili ~2.5 s bila `paperSpeed=25` dan `gridSize` adalah piksel per mm.
+   - Opsi B: bila ingin menampilkan seluruh `duration`, gunakan `paperSpeed=25`/`50` yang konsisten dan perluas kanvas/lebar panel agar waktu yang diinginkan benar‑benar mempunyai skala 25 mm/s (bukan dipaksa). Jangan gunakan `width/maxTime` untuk waktu, karena itu mengubah time base klinis.
+
+2) Usulan perubahan kode konkret di `src/renderer.ts` (tolong berikan cuplikan kode TypeScript/JS yang bisa langsung ditempel):
+   - Ubah perhitungan skala waktu:
+     - Saat ini: `const timeScale = Math.min(pxPerSecond, width / maxTime);`
+     - Usulan: `const timeScale = pxPerSecond;` lalu batasi data yang dirender pada rentang waktu yang muat: `visibleSeconds = width / timeScale`.
+     - Filter titik yang berada dalam `[t0, t0 + visibleSeconds]` untuk panel tersebut (mis. `t0=0` untuk semua panel terlebih dahulu). Alternatif: potong/segmentasi per beat sehingga pola berulang tampak natural.
+   - Pastikan skala amplitudo tepat: `amplitudeScale = gain(mm/mV) * pxPerMm`. Dengan `gain=10` dan `gridSize=5 px/mm`, maka 1 mV = 50 px vertikal. Verifikasi di layar: 2 kotak besar = 1 mV.
+   - Pastikan label info menunjukkan kalibrasi: `Gain 10 mm/mV, Speed 25 mm/s` dan cocok dengan grid di kanvas.
+
+3) Penyesuaian di `src/generator.ts` bila diperlukan:
+   - Pastikan default `heartRate`, `prInterval`, `qrsWidth`, `qtInterval`, `pWave.duration`, `tWave.duration` sesuai nilai normal sebagaimana di atas.
+   - Jika ingin tampilan “standar kertas”, set `duration` di generator ke sekitar 2.5–3.0 s agar pas dengan panel, atau biarkan `duration` panjang (mis. 10 s) tapi renderer hanya menampilkan window 2.5 s.
+
+4) Validasi klinis di UI (checklist akurasi):
+   - Di 25 mm/s dan grid 1 mm = 5 px: 1 kotak kecil (5 px) = 40 ms, 1 kotak besar (25 px) = 200 ms. Ukur dengan penggaris devtools bila perlu.
+   - Set HR ke 60 bpm → jarak R‑R ≈ 1000 ms → pada 25 mm/s = 25 mm (5 kotak besar) → di kanvas ≈ 125 px bila `gridSize=5 px/mm`.
+   - QRS width default 0.08 s → dua kotak kecil (≈2 mm) pada 25 mm/s. Pastikan tampak sesuai di kanvas.
+   - PR 0.16 s → empat kotak kecil (≈4 mm) pada 25 mm/s.
+   - Gain 10 mm/mV → defleksi 1 mV = 10 mm = 2 kotak besar.
+
+5) Hasil akhir yang kami harapkan dari ChatGPT:
+   - Penjelasan singkat akar masalah “QRS terlalu rapat” (fit-to-width waktu yang salah) dengan referensi rumus.
+   - Rencana perubahan yang eksplisit (langkah kode) untuk `src/renderer.ts` dan, jika perlu, `src/generator.ts` agar time base dan amplitude mengikuti standar klinis.
+   - Cuplikan kode siap tempel untuk:
+     - Menghitung `pxPerSecond` dan menetapkan `timeScale` tetap pada `pxPerSecond`.
+     - Menentukan `visibleSeconds = width / pxPerSecond` dan memotong data titik per lead ke window waktu itu.
+     - Opsi untuk menggeser/scroll window atau memilih startTime per panel.
+   - Saran uji manual di demo agar kami bisa ukur kotak dan interval aktual di kanvas, membuktikan bahwa PR/QRS/QT/HR dan kalibrasi mV sesuai “real life”.
+
+Catatan penting untuk konsistensi istilah dan satuan:
+- `gridSize` di kode saat ini dipakai sebagai “pixel per mm”. Mohon tahan asumsi ini dan perjelas dalam solusi.
+- `paperSpeed` dalam mm/s dan `gain` dalam mm/mV harus langsung terjemah ke piksel: `px/s = paperSpeed * gridSize`, `px/mV = gain * gridSize`.
+- Jangan gunakan heuristik yang mengubah time base (mis. `width/maxTime`) karena itu memalsukan skala klinis.
+
+Mohon jawab dengan:
+- Ringkasan masalah dan koreksi teoretis (singkat dan tepat).
+- Patch kode konkret (blok kode `diff` atau fungsi yang diubah) dengan komentar minimal agar mudah ditempel.
+- Langkah verifikasi visual dengan angka (mm → px, ms → mm) sampai kami bisa melihat QRS dan interval lainnya tampil sesuai ukuran klinis.
 
 Kita butuh library TypeScript ringan untuk mensimulasikan 12-lead ECG edukasional (bukan diagnostik). Pengguna harus bisa:
 
