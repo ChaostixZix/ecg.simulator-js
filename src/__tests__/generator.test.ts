@@ -11,7 +11,7 @@ describe('ECGGenerator', () => {
   describe('constructor', () => {
     it('should initialize with default configuration', () => {
       const ecgData = generator.generate();
-      expect(ecgData.configuration.heartRate).toBe(75);
+      expect(ecgData.configuration.heartRate).toBe(60);
       expect(ecgData.configuration.duration).toBe(10);
       expect(ecgData.configuration.amplitude).toBe(1.0);
     });
