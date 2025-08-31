@@ -3,10 +3,10 @@
 A lightweight TypeScript library for educational 12-lead ECG simulation with Canvas/SVG rendering support.
 
 **Normal ECG Pattern:**
-![Normal ECG Pattern](https://github.com/user-attachments/assets/295017ee-825e-422c-b939-fb695c8240e6)
+![Normal ECG Pattern](https://github.com/user-attachments/assets/f5657f13-b465-45ed-8685-b5ab4883a16f)
 
 **STEMI - Anterior Pattern:**
-![STEMI Anterior Pattern](https://github.com/user-attachments/assets/5ba518ee-0716-401b-bbb2-937c1a4e698d)
+![STEMI Anterior Pattern](https://github.com/user-attachments/assets/f513fabc-9942-4709-98a8-c04ecc33d6ac)
 
 
 ## Features
