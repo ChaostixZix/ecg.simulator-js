@@ -7,7 +7,7 @@ export class ECGGenerator {
 
   constructor(config: Partial<ECGConfiguration> = {}) {
     this.config = {
-      heartRate: 75,
+      heartRate: 60,
       duration: 10,
       samplingRate: 1000,
       amplitude: 1.0,

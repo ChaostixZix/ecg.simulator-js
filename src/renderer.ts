@@ -81,18 +81,26 @@ export class ECGRenderer {
     ctx.lineWidth = 1.5;
     ctx.beginPath();
 
-    const maxTime = Math.max(...leadData.data.map(p => p.time));
-    // Pixels per second based on ECG paper speed (mm/s) and pixels-per-mm (gridSize)
+    // Clinical time base: always paperSpeed (mm/s) * gridSize (px/mm)
     const pxPerSecond = paperSpeed * gridSize;
-    // If the trace would overflow, fall back to fit-to-width
-    const timeScale = Math.min(pxPerSecond, width / maxTime);
+    const timeScale = pxPerSecond;
+
+    // Visible time window in seconds for this panel
+    const visibleSeconds = width / timeScale;
+    const startTime = this.options.startTime ?? 0;
+    const endTime = startTime + visibleSeconds;
+
     // Pixels per mV = gain (mm/mV) * pixels-per-mm (gridSize)
     const amplitudeScale = gain * gridSize;
     const baselineY = yOffset + height / 2;
 
+    // Render only samples within the visible window
+    const points = leadData.data.filter(p => p.time >= startTime && p.time <= endTime);
+    if (points.length === 0) return;
+
     let isFirstPoint = true;
-    for (const point of leadData.data) {
-      const x = xOffset + point.time * timeScale;
+    for (const point of points) {
+      const x = xOffset + (point.time - startTime) * timeScale;
       const y = baselineY - point.amplitude * amplitudeScale;
 
       if (isFirstPoint) {
@@ -191,20 +199,25 @@ export class ECGRenderer {
       const h = leadHeight - 2 * panelPadding;
 
       if (leadData.data.length > 0) {
-        const maxTime = Math.max(...leadData.data.map(p => p.time));
-        const pxPerSecond = paperSpeed * gridSize;
-        const timeScale = Math.min(pxPerSecond, w / maxTime);
+        const pxPerSecond = paperSpeed * gridSize; // clinical
+        const timeScale = pxPerSecond;
+        const visibleSeconds = w / timeScale;
+        const startTime = this.options.startTime ?? 0;
+        const endTime = startTime + visibleSeconds;
         const amplitudeScale = gain * gridSize;
         const baselineY = y + h / 2;
 
-        let pathD = '';
-        leadData.data.forEach((point, i) => {
-          const px = x + point.time * timeScale;
-          const py = baselineY - point.amplitude * amplitudeScale;
-          pathD += i === 0 ? `M ${px} ${py}` : ` L ${px} ${py}`;
-        });
+        const points = leadData.data.filter(p => p.time >= startTime && p.time <= endTime);
+        if (points.length > 0) {
+          let pathD = '';
+          points.forEach((point, i) => {
+            const px = x + (point.time - startTime) * timeScale;
+            const py = baselineY - point.amplitude * amplitudeScale;
+            pathD += i === 0 ? `M ${px} ${py}` : ` L ${px} ${py}`;
+          });
 
-        svg += `<path d="${pathD}" fill="none" stroke="${traceColor}" stroke-width="1.5"/>`;
+          svg += `<path d="${pathD}" fill="none" stroke="${traceColor}" stroke-width="1.5"/>`;
+        }
       }
 
       if (showLabels) {

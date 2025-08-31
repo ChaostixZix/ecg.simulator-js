@@ -49,5 +49,6 @@ export interface RenderOptions {
     panelPadding: number;
     panelGapX: number;
     panelGapY: number;
+    startTime?: number;
 }
 //# sourceMappingURL=types.d.ts.map

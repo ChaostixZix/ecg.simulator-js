@@ -90,13 +90,33 @@ export function generateSTSegment(
   samplingRate: number
 ): ECGPoint[] {
   const points: ECGPoint[] = [];
-  const duration = endTime - startTime;
-  const samples = Math.floor(duration * samplingRate);
-  
+  const duration = Math.max(0, endTime - startTime);
+  const samples = Math.max(1, Math.floor(duration * samplingRate));
+
+  // Smooth the ST onsets/offsets to avoid boxy corners.
+  // Use short raised-cosine (Hann) tapers at both ends.
+  const maxTaper = 0.04; // 40 ms typical J-point smoothing
+  const taper = Math.min(maxTaper, duration * 0.3); // up to 30% of ST duration
+  const rampIn = taper;
+  const rampOut = taper;
+
   for (let i = 0; i < samples; i++) {
-    const time = startTime + (i / samplingRate);
-    points.push({ time, amplitude: elevation });
+    const time = startTime + i / samplingRate;
+    const rel = time - startTime;
+
+    let w = 1;
+    if (rel < rampIn && rampIn > 0) {
+      // 0 -> 1 with raised cosine
+      const x = rel / rampIn; // 0..1
+      w = 0.5 - 0.5 * Math.cos(Math.PI * x);
+    } else if (rel > duration - rampOut && rampOut > 0) {
+      // 1 -> 0 with raised cosine
+      const x = (duration - rel) / rampOut; // 1..0
+      w = 0.5 - 0.5 * Math.cos(Math.PI * x);
+    }
+
+    points.push({ time, amplitude: elevation * w });
   }
-  
+
   return points;
 }

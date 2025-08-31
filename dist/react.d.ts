@@ -51,6 +51,7 @@ interface RenderOptions {
     panelPadding: number;
     panelGapX: number;
     panelGapY: number;
+    startTime?: number;
 }
 
 interface ECGCanvasProps {
