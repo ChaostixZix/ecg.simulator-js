@@ -48,31 +48,83 @@ function generateTWave(centerTime, config, samplingRate) {
     const sigma = config.duration / 4;
     return generateGaussianWave(centerTime, config.amplitude, sigma, config.duration, samplingRate);
 }
-function generateSTSegment(startTime, endTime, elevation, samplingRate) {
+function generateSTSegment(startTime, endTime, elevation, samplingRate, 
+// Optional context to allow matching derivatives with T-wave if available
+context, params = {}) {
     const points = [];
     const duration = Math.max(0, endTime - startTime);
     const samples = Math.max(1, Math.floor(duration * samplingRate));
-    // Smooth the ST onsets/offsets to avoid boxy corners.
-    // Use short raised-cosine (Hann) tapers at both ends.
-    const maxTaper = 0.04; // 40 ms typical J-point smoothing
-    const taper = Math.min(maxTaper, duration * 0.3); // up to 30% of ST duration
-    const rampIn = taper;
-    const rampOut = taper;
-    for (let i = 0; i < samples; i++) {
-        const time = startTime + i / samplingRate;
-        const rel = time - startTime;
-        let w = 1;
-        if (rel < rampIn && rampIn > 0) {
-            // 0 -> 1 with raised cosine
-            const x = rel / rampIn; // 0..1
-            w = 0.5 - 0.5 * Math.cos(Math.PI * x);
+    // Defaults per prompt-answer.md
+    const model = params.stModel ?? 'hermite';
+    const takeMs = params.stTakeoffMs ?? 30; // 20–40 typical
+    const fallMs = params.stFallMs ?? 30; // 20–40 typical
+    const curvature = params.stCurvature ?? 0.6; // convex for STEMI
+    const alpha = params.alphaTakeoff ?? 1.0;
+    // Value at J-point (end of QRS). If unknown, assume baseline 0 in our model.
+    const v0 = context?.v0 ?? 0;
+    const vPeak = v0 + elevation; // target elevation level
+    // Slope at start (mV/s). If we don't have a measured QRS slope, derive from takeoff.
+    let s0 = elevation / Math.max(1, takeMs) * 1000; // (mV) / (ms) -> mV/s
+    s0 *= alpha;
+    // Slope at end, try from context (Gaussian T) else 0
+    let s1 = typeof params.s1Override === 'number' ? params.s1Override : 0;
+    if (params.s1Override == null && context?.tT != null && context?.tTSigma != null && context?.vTstart != null) {
+        const A = context.vTstart; // approximate T amplitude at stEnd
+        const sigma = context.tTSigma;
+        const dt = endTime - context.tT;
+        s1 = A * (-(dt) / (sigma * sigma)) * Math.exp(-(dt * dt) / (2 * sigma * sigma));
+    }
+    if (model === 'hermite') {
+        // Cubic Hermite interpolation ensuring C1 continuity of value and slope
+        const L = Math.max(1e-6, duration);
+        const m0 = s0 * L;
+        const m1 = s1 * L;
+        for (let i = 0; i < samples; i++) {
+            const time = startTime + i / samplingRate;
+            // normalized u in [0,1]
+            const u = samples > 1 ? (i / (samples - 1)) : 0;
+            const u2 = u * u;
+            const u3 = u2 * u;
+            const h00 = 2 * u3 - 3 * u2 + 1;
+            const h10 = u3 - 2 * u2 + u;
+            const h01 = -2 * u3 + 3 * u2;
+            const h11 = u3 - u2;
+            const amp = h00 * v0 + h10 * m0 + h01 * vPeak + h11 * m1;
+            points.push({ time, amplitude: amp });
         }
-        else if (rel > duration - rampOut && rampOut > 0) {
-            // 1 -> 0 with raised cosine
-            const x = (duration - rel) / rampOut; // 1..0
-            w = 0.5 - 0.5 * Math.cos(Math.PI * x);
+    }
+    else {
+        // Sigmoid -> Arc -> Sigmoid with curvature control
+        const L = Math.max(1e-6, duration);
+        const r = Math.min(0.45, (takeMs / 1000) / L);
+        const f = Math.min(0.45, (fallMs / 1000) / L);
+        const midLen = Math.max(1e-6, 1 - r - f);
+        const vEnd = context?.vTstart ?? v0; // target to blend toward T onset if known
+        for (let i = 0; i < samples; i++) {
+            const time = startTime + i / samplingRate;
+            const u = samples > 1 ? (i / (samples - 1)) : 0;
+            let amp;
+            if (u <= r && r > 0) {
+                // quintic smoothstep for takeoff
+                const w = u / r;
+                const S = 6 * w ** 5 - 15 * w ** 4 + 10 * w ** 3; // C2
+                amp = v0 + (vPeak - v0) * S;
+            }
+            else if (u >= 1 - f && f > 0) {
+                // fall toward vEnd
+                const w = (u - (1 - f)) / f;
+                const S = 6 * w ** 5 - 15 * w ** 4 + 10 * w ** 3; // C2
+                amp = vPeak * (1 - S) + vEnd * S;
+            }
+            else {
+                // mid-arc dome with curvature shaping
+                const s = (u - r) / midLen; // 0..1
+                const dome = (1 - Math.cos(Math.PI * s)) / 2; // 0..1
+                const peakScale = 1 + 0.35 * curvature;
+                amp = v0 + (vPeak - v0) * dome * peakScale;
+            }
+            points.push({ time, amplitude: amp });
         }
-        points.push({ time, amplitude: elevation * w });
     }
     return points;
 }

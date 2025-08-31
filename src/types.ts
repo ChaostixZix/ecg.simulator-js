@@ -31,6 +31,21 @@ export interface WaveformConfig {
   amplitude: number;
   duration: number;
   shape: 'gaussian' | 'triangular' | 'custom';
+  // Optional fine control for QRS only (ignored by P/T)
+  qrs?: {
+    // Time offsets relative to center in fractions of duration (e.g., -0.3 means 30% of duration before center)
+    qOffsetFrac?: number; // default -0.3
+    rOffsetFrac?: number; // default 0
+    sOffsetFrac?: number; // default +0.3
+    // Widths as fractions of total QRS duration that shape each component
+    qWidthFrac?: number;  // default 0.2
+    rWidthFrac?: number;  // default 0.4
+    sWidthFrac?: number;  // default 0.2
+    // Amplitude multipliers relative to base amplitude (Q/S negative by default)
+    qAmpMul?: number;     // default -0.3
+    rAmpMul?: number;     // default +1.0
+    sAmpMul?: number;     // default -0.2
+  };
 }
 
 export interface STSegmentConfig {

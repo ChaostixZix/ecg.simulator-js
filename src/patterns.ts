@@ -17,7 +17,11 @@ export class ClinicalPatterns {
           elevation: { V1: 0.3, V2: 0.4, V3: 0.5, V4: 0.4 },
           depression: { II: 0.1, III: 0.1, aVF: 0.1 }
         },
-        qrsComplex: { amplitude: 1.2, duration: 0.08, shape: 'triangular' },
+        qrsComplex: { 
+          amplitude: 1.2, duration: 0.08, shape: 'triangular',
+          // Raise S-wave (less negative) to visually match early ST elevation takeoff
+          qrs: { sAmpMul: -0.05 }
+        },
         tWave: { amplitude: 0.5, duration: 0.18, shape: 'gaussian' }
       },
 
@@ -27,7 +31,10 @@ export class ClinicalPatterns {
           elevation: { II: 0.4, III: 0.5, aVF: 0.4 },
           depression: { I: 0.1, aVL: 0.15, V2: 0.1 }
         },
-        qrsComplex: { amplitude: 1.1, duration: 0.08, shape: 'triangular' },
+        qrsComplex: { 
+          amplitude: 1.1, duration: 0.08, shape: 'triangular',
+          qrs: { sAmpMul: -0.05 }
+        },
         tWave: { amplitude: 0.4, duration: 0.17, shape: 'gaussian' }
       },
 
@@ -37,7 +44,10 @@ export class ClinicalPatterns {
           elevation: { I: 0.3, aVL: 0.4, V5: 0.4, V6: 0.3 },
           depression: { II: 0.1, III: 0.1, aVF: 0.1 }
         },
-        qrsComplex: { amplitude: 1.3, duration: 0.08, shape: 'triangular' },
+        qrsComplex: { 
+          amplitude: 1.3, duration: 0.08, shape: 'triangular',
+          qrs: { sAmpMul: -0.05 }
+        },
         tWave: { amplitude: 0.4, duration: 0.16, shape: 'gaussian' }
       },
 
