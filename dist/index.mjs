@@ -30,15 +30,26 @@ function generatePWave(centerTime, config, samplingRate) {
 function generateQRSComplex(centerTime, config, samplingRate) {
     const points = [];
     const qrsWidth = config.duration;
-    const qAmplitude = -config.amplitude * 0.3;
-    const rAmplitude = config.amplitude;
-    const sAmplitude = -config.amplitude * 0.2;
-    const qTime = centerTime - qrsWidth * 0.3;
-    const rTime = centerTime;
-    const sTime = centerTime + qrsWidth * 0.3;
-    const qWave = generateTriangularWave(qTime, qAmplitude, qrsWidth * 0.2, samplingRate);
-    const rWave = generateTriangularWave(rTime, rAmplitude, qrsWidth * 0.4, samplingRate);
-    const sWave = generateTriangularWave(sTime, sAmplitude, qrsWidth * 0.2, samplingRate);
+    const qc = config.qrs ?? {};
+    // Defaults mirror prior behavior
+    const qOffsetFrac = qc.qOffsetFrac ?? -0.3;
+    const rOffsetFrac = qc.rOffsetFrac ?? 0;
+    const sOffsetFrac = qc.sOffsetFrac ?? 0.3;
+    const qWidthFrac = qc.qWidthFrac ?? 0.2;
+    const rWidthFrac = qc.rWidthFrac ?? 0.4;
+    const sWidthFrac = qc.sWidthFrac ?? 0.2;
+    const qAmpMul = qc.qAmpMul ?? -0.3;
+    const rAmpMul = qc.rAmpMul ?? 1.0;
+    const sAmpMul = qc.sAmpMul ?? -0.2;
+    const qAmplitude = config.amplitude * qAmpMul;
+    const rAmplitude = config.amplitude * rAmpMul;
+    const sAmplitude = config.amplitude * sAmpMul;
+    const qTime = centerTime + qrsWidth * qOffsetFrac;
+    const rTime = centerTime + qrsWidth * rOffsetFrac;
+    const sTime = centerTime + qrsWidth * sOffsetFrac;
+    const qWave = generateTriangularWave(qTime, qAmplitude, qrsWidth * qWidthFrac, samplingRate);
+    const rWave = generateTriangularWave(rTime, rAmplitude, qrsWidth * rWidthFrac, samplingRate);
+    const sWave = generateTriangularWave(sTime, sAmplitude, qrsWidth * sWidthFrac, samplingRate);
     points.push(...qWave, ...rWave, ...sWave);
     return points.sort((a, b) => a.time - b.time);
 }
@@ -632,7 +643,11 @@ class ClinicalPatterns {
                     elevation: { V1: 0.3, V2: 0.4, V3: 0.5, V4: 0.4 },
                     depression: { II: 0.1, III: 0.1, aVF: 0.1 }
                 },
-                qrsComplex: { amplitude: 1.2, duration: 0.08, shape: 'triangular' },
+                qrsComplex: {
+                    amplitude: 1.2, duration: 0.08, shape: 'triangular',
+                    // Raise S-wave (less negative) to visually match early ST elevation takeoff
+                    qrs: { sAmpMul: -0.05 }
+                },
                 tWave: { amplitude: 0.5, duration: 0.18, shape: 'gaussian' }
             },
             'stemi-inferior': {
@@ -641,7 +656,10 @@ class ClinicalPatterns {
                     elevation: { II: 0.4, III: 0.5, aVF: 0.4 },
                     depression: { I: 0.1, aVL: 0.15, V2: 0.1 }
                 },
-                qrsComplex: { amplitude: 1.1, duration: 0.08, shape: 'triangular' },
+                qrsComplex: {
+                    amplitude: 1.1, duration: 0.08, shape: 'triangular',
+                    qrs: { sAmpMul: -0.05 }
+                },
                 tWave: { amplitude: 0.4, duration: 0.17, shape: 'gaussian' }
             },
             'stemi-lateral': {
@@ -650,7 +668,10 @@ class ClinicalPatterns {
                     elevation: { I: 0.3, aVL: 0.4, V5: 0.4, V6: 0.3 },
                     depression: { II: 0.1, III: 0.1, aVF: 0.1 }
                 },
-                qrsComplex: { amplitude: 1.3, duration: 0.08, shape: 'triangular' },
+                qrsComplex: {
+                    amplitude: 1.3, duration: 0.08, shape: 'triangular',
+                    qrs: { sAmpMul: -0.05 }
+                },
                 tWave: { amplitude: 0.4, duration: 0.16, shape: 'gaussian' }
             },
             nstemi: {
