@@ -23,6 +23,21 @@ function gaussian(t, amp, center, width) {
   return amp * Math.exp(-0.5 * x * x);
 }
 
+// Smoothstep helper for soft windowing (C1 continuous)
+function smoothstep01(x) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  return x * x * (3 - 2 * x);
+}
+
+// Window function to gently taper S-wave tail after J-point
+function sWindow(t_ms, sEnd_ms, tail_ms) {
+  if (t_ms <= sEnd_ms) return 1;
+  if (t_ms >= sEnd_ms + tail_ms) return 0;
+  const u = (t_ms - sEnd_ms) / tail_ms;
+  return 1 - smoothstep01(u);
+}
+
 function defaultMorphology() {
   return {
     P: { amp_mV: 0.1, width_ms: 60, center_ms: -180 },
@@ -95,49 +110,86 @@ function createSimulator(options = {}) {
 
   function applyTemplate(name, opts = {}) {
     const g = groups();
-    const mag = opts.mm ?? 2;
-    const dep = opts.depression_mm ?? 1;
+    const mag = opts.mm ?? 2; // target ST-elevation in mm for primary territory
+    const dep = opts.depression_mm ?? 1; // reciprocal depression magnitude
     const tInv = opts.t_inversion ?? false;
+    const hyper = opts.hyperacute_factor ?? 1.6; // T-wave amplification on involved leads
+
     function addST(leads, mm) {
       for (const L of leads) setLeadParams(L, { ST_offset_mm: mm });
+    }
+    function addSTMap(map) {
+      for (const L of Object.keys(map)) setLeadParams(L, { ST_offset_mm: map[L] });
+    }
+    function scaleT(leads, factor) {
+      for (const L of leads) setLeadParams(L, { T: { amp_mV: (leadParams[L].T.amp_mV) * factor } });
     }
     function invertT(leads, factor = -1) {
       for (const L of leads) setLeadParams(L, { T: { amp_mV: (leadParams[L].T.amp_mV) * factor } });
     }
+
     if (name === "stemi-anterior") {
-      addST(g.anterior, mag);
-      addST(g.inferior, -mag * 0.5);
+      // Primary: V2–V4 elevated; V1/V5/V6 mild; reciprocals in II/III/aVF
+      addSTMap({ V2: mag, V3: mag, V4: mag, V1: mag * 0.5, V5: mag * 0.6, V6: mag * 0.6 });
+      addST(["II", "III", "aVF"], -dep);
+      scaleT(["V2", "V3", "V4", "V5", "V6"], hyper);
     } else if (name === "stemi-inferior") {
-      addST(g.inferior, mag);
-      addST(["I", "aVL"], -mag * 0.5);
+      // Primary: II, III, aVF elevated (III sering paling tinggi); reciprocals di I/aVL (dan ringan V1–V3)
+      addSTMap({ II: mag, III: mag * 1.1, aVF: mag });
+      addST(["I", "aVL"], -dep);
+      addST(["V1", "V2"], -dep * 0.5);
+      scaleT(["II", "III", "aVF"], hyper);
     } else if (name === "stemi-lateral") {
-      addST(g.lateral, mag);
-      addST(["III", "aVF"], -mag * 0.5);
+      // Primary: I, aVL, V5, V6 elevated; reciprocals di III/aVF
+      addSTMap({ I: mag, aVL: mag, V5: mag, V6: mag });
+      addST(["III", "aVF"], -dep);
+      scaleT(["I", "aVL", "V5", "V6"], hyper);
     } else if (name === "nstemi") {
-      addST(g.lateral, -dep);
-      addST(g.anterior, -dep * 0.5);
-      if (tInv) invertT([...g.lateral, ...g.anterior]);
+      // ST-depression di lateral/anterior; opsional inversi T
+      addST(["V4", "V5", "V6", "I", "aVL"], -dep);
+      addST(["V2", "V3"], -dep * 0.5);
+      if (tInv) invertT(["V2", "V3", "V4", "V5", "V6", "I", "aVL"]);
     } else if (name === "pericarditis") {
-      addST([...g.limb.filter(l => l !== "aVR"), "V2", "V3", "V4", "V5", "V6"], clamp(mag, 0.5, 1.5));
-      addST(["aVR", "V1"], -clamp(mag, 0.5, 1.5) * 0.6);
+      // Diffuse concave ST elevation, reciprocal depression in aVR (±V1)
+      const m = clamp(mag, 0.5, 1.5);
+      addST(["I", "II", "III", "aVL", "aVF", "V2", "V3", "V4", "V5", "V6"], m);
+      addST(["aVR"], -m * 0.6);
+      addST(["V1"], -m * 0.2);
+      // T usually not hyperacute; keep default
     } else {
       throw new Error(`Unknown template: ${name}`);
     }
   }
 
   function beatValueAt(t_ms, morph, gain) {
+    // J-point: end of S-wave window
+    const jPoint = morph.S.center_ms + 2 * morph.S.width_ms;
+    const tCarryEnd = morph.T.center_ms + 2 * morph.T.width_ms;
+
+    // Base waves
     let v = 0;
     v += gaussian(t_ms, morph.P.amp_mV, morph.P.center_ms, morph.P.width_ms);
     v += gaussian(t_ms, morph.Q.amp_mV, morph.Q.center_ms, morph.Q.width_ms);
     v += gaussian(t_ms, morph.R.amp_mV, morph.R.center_ms, morph.R.width_ms);
-    v += gaussian(t_ms, morph.S.amp_mV, morph.S.center_ms, morph.S.width_ms);
+
+    // S-wave with tapered tail after J-point to avoid spurious dip
+    const sTailMs = 30; // gentle fade-out over 30 ms
+    let sVal = gaussian(t_ms, morph.S.amp_mV, morph.S.center_ms, morph.S.width_ms);
+    sVal *= sWindow(t_ms, jPoint, sTailMs);
+    v += sVal;
+
+    // T-wave
     v += gaussian(t_ms, morph.T.amp_mV, morph.T.center_ms, morph.T.width_ms);
-    const qrsEnd = morph.S.center_ms + 2 * morph.S.width_ms;
-    const tStart = qrsEnd;
-    const tEnd = morph.T.center_ms - Math.min(60, 0.5 * morph.T.width_ms);
-    if (t_ms >= tStart && t_ms <= tEnd) {
-      v += mmToMv(morph.ST_offset_mm, gain);
+
+    // ST baseline carry: from J through end of T
+    const stOffsetMm = (morph.ST && typeof morph.ST.offset_mm === 'number')
+      ? morph.ST.offset_mm
+      : (typeof morph.ST_offset_mm === 'number' ? morph.ST_offset_mm : 0);
+    const stOffsetMv = mmToMv(stOffsetMm, gain);
+    if (t_ms >= jPoint && t_ms <= tCarryEnd) {
+      v += stOffsetMv;
     }
+
     return v;
   }
 
